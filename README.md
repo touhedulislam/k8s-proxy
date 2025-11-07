@@ -20,9 +20,9 @@ This tool uses kubectl v1.22 for port-forwarding to provide reliable database co
 ## Requirements
 
 - Bash 4.0+
-- kubectl v1.22.0 (automatically installed by k8s-proxy)
+- kubectl v1.22.0 (see installation instructions below)
 - `python3` (for random port generation)
-- `ss` command (for port checking)
+- Standard Unix tools: `grep`, `cut`, `awk`, `sort`, `tr`, `ss`
 - Access to a Kubernetes cluster
 
 ## Installation

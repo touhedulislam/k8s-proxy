@@ -1,0 +1,223 @@
+#!/bin/bash
+
+# k8s-proxy - Manage kubectl port-forwards to Kubernetes services
+# Uses kubectl v1.22 to work around port-forward SSL bug in v1.23+
+#
+# Background: kubectl v1.23+ has a regression (kubernetes/kubernetes#103526)
+# that causes port-forward to terminate on PostgreSQL SSL connection resets.
+# kubectl v1.22 and earlier auto-reconnect on errors, working around the issue.
+#
+# Usage:
+#   k8s-proxy start <service.namespace> <port> [local-port]
+#   k8s-proxy list
+#   k8s-proxy kill <service-name|local-port|pid>
+
+set -e
+
+STATE_DIR="$HOME/.local/share/k8s-proxy"
+KUBECTL="$HOME/.local/bin/kubectl-1.22"
+
+# Ensure state directory exists
+mkdir -p "$STATE_DIR"
+
+# Validate kubectl-1.22 exists
+if [ ! -x "$KUBECTL" ]; then
+    echo "Error: kubectl-1.22 not found at $KUBECTL"
+    echo "Please install kubectl v1.22 to work around port-forward SSL bug"
+    exit 1
+fi
+
+# Clean up stale tunnel files
+cleanup_stale() {
+    for file in "$STATE_DIR"/*.tunnel; do
+        [ -e "$file" ] || continue
+        pid=$(basename "$file" .tunnel)
+        if ! kill -0 "$pid" 2>/dev/null; then
+            rm -f "$file"
+        fi
+    done
+}
+
+# List all active tunnels
+list_tunnels() {
+    cleanup_stale
+
+    echo "Active k8s-proxy tunnels:"
+    echo "----------------------------"
+
+    found=0
+    for file in "$STATE_DIR"/*.tunnel; do
+        [ -e "$file" ] || continue
+        found=1
+
+        pid=$(basename "$file" .tunnel)
+        service=$(grep "^SERVICE=" "$file" | cut -d= -f2)
+        local_port=$(grep "^LOCAL_PORT=" "$file" | cut -d= -f2)
+        remote_port=$(grep "^REMOTE_PORT=" "$file" | cut -d= -f2)
+
+        echo "PID: $pid"
+        echo "  Service: $service"
+        echo "  Local:   localhost:$local_port"
+        echo "  Remote:  $service:$remote_port"
+        echo ""
+    done
+
+    if [ $found -eq 0 ]; then
+        echo "No active tunnels"
+    fi
+}
+
+# Kill a tunnel by identifier
+kill_tunnel() {
+    cleanup_stale
+
+    identifier="$1"
+
+    if [ -z "$identifier" ]; then
+        echo "Error: Please provide a service name, local port, or PID to kill"
+        exit 1
+    fi
+
+    # Check if it's a PID
+    if [ -f "$STATE_DIR/$identifier.tunnel" ]; then
+        kill "$identifier" 2>/dev/null || true
+        rm -f "$STATE_DIR/$identifier.tunnel"
+        echo "Killed tunnel with PID $identifier"
+    else
+        # Search by service name or local port
+        killed=0
+        for file in "$STATE_DIR"/*.tunnel; do
+            [ -e "$file" ] || continue
+
+            pid=$(basename "$file" .tunnel)
+            service=$(grep "^SERVICE=" "$file" | cut -d= -f2)
+            local_port=$(grep "^LOCAL_PORT=" "$file" | cut -d= -f2)
+
+            if [ "$service" = "$identifier" ] || [ "$local_port" = "$identifier" ]; then
+                kill "$pid" 2>/dev/null || true
+                rm -f "$file"
+                echo "Killed tunnel: $service (PID $pid, local port $local_port)"
+                killed=1
+            fi
+        done
+
+        if [ $killed -eq 0 ]; then
+            echo "Error: No tunnel found matching '$identifier'"
+            exit 1
+        fi
+    fi
+}
+
+# Open a new tunnel
+open_tunnel() {
+    service_name="$1"
+    remote_port="$2"
+    local_port="$3"
+
+    if [ -z "$service_name" ] || [ -z "$remote_port" ]; then
+        echo "Usage: k8s-proxy start <service.namespace> <port> [local-port]"
+        echo "Example: k8s-proxy start topkamc-postgres-rw.topkamc 5432 5432"
+        exit 1
+    fi
+
+    # Set local port to remote port if not specified
+    if [ -z "$local_port" ]; then
+        local_port="$remote_port"
+    fi
+
+    # Handle random port
+    if [ "$local_port" = "random" ]; then
+        local_port=$(python3 -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1]); s.close()')
+        echo "Using random local port: $local_port"
+    fi
+
+    # Check if local port is already in use
+    if ss -ln | grep -q ":$local_port "; then
+        echo "Error: Local port $local_port is already in use"
+        exit 1
+    fi
+
+    # Parse service.namespace format
+    if [[ "$service_name" == *.* ]]; then
+        namespace="${service_name##*.}"
+        service="${service_name%.*}"
+    else
+        echo "Error: Service must be in format: service.namespace"
+        echo "Example: topkamc-postgres-rw.topkamc"
+        exit 1
+    fi
+
+    echo "Creating tunnel: localhost:$local_port -> $service_name:$remote_port"
+    echo "Using kubectl v1.22 (workaround for v1.23+ SSL bug)"
+
+    # Create port-forward using kubectl-1.22 (auto-reconnects on errors)
+    "$KUBECTL" port-forward -n "$namespace" "service/$service" "$local_port:$remote_port" &
+    tunnel_pid=$!
+
+    # Wait for port-forward to be ready
+    sleep 2
+
+    # Verify tunnel is still running
+    if ! kill -0 "$tunnel_pid" 2>/dev/null; then
+        echo "Error: Failed to create port-forward"
+        exit 1
+    fi
+
+    # Save tunnel metadata
+    cat > "$STATE_DIR/$tunnel_pid.tunnel" <<EOF
+SERVICE=$service_name
+LOCAL_PORT=$local_port
+REMOTE_PORT=$remote_port
+NAMESPACE=$namespace
+CREATED=$(date +%s)
+EOF
+
+    echo "Tunnel created successfully!"
+    echo "PID: $tunnel_pid"
+    echo "Connect to: localhost:$local_port"
+}
+
+# Main command dispatcher
+case "${1:-}" in
+    start)
+        shift
+        open_tunnel "$@"
+        ;;
+    list)
+        list_tunnels
+        ;;
+    kill)
+        kill_tunnel "$2"
+        ;;
+    "")
+        echo "k8s-proxy - Manage kubectl port-forwards to Kubernetes services"
+        echo ""
+        echo "Uses kubectl v1.22 to work around SSL bug in v1.23+"
+        echo "(See: https://github.com/kubernetes/kubernetes/pull/103526)"
+        echo ""
+        echo "Usage:"
+        echo "  k8s-proxy start <service.namespace> <port> [local-port]"
+        echo "      Open a port-forward to a Kubernetes service"
+        echo "      local-port: Defaults to same as remote port"
+        echo "      Use 'random' for local-port to get a random port"
+        echo ""
+        echo "  k8s-proxy list"
+        echo "      List all active tunnels"
+        echo ""
+        echo "  k8s-proxy kill <service-name|local-port|pid>"
+        echo "      Kill a specific tunnel"
+        echo ""
+        echo "Examples:"
+        echo "  k8s-proxy start topkamc-postgres-rw.topkamc 5432"
+        echo "  k8s-proxy start topkamc-postgres-rw.topkamc 5432 15432"
+        echo "  k8s-proxy start openvote-postgres-rw.openvote 5432 random"
+        echo "  k8s-proxy list"
+        echo "  k8s-proxy kill topkamc-postgres-rw.topkamc"
+        echo "  k8s-proxy kill 15432"
+        ;;
+    *)
+        echo "Error: Unknown command '$1'"
+        echo "Run 'k8s-proxy' for usage information"
+        exit 1
+        ;;
+esac

